@@ -171,7 +171,6 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-*.jar
 *.war
 *.ear
 *.zip
