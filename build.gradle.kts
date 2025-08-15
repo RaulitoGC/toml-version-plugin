@@ -14,7 +14,6 @@ repositories {
 
 dependencies {
     implementation(gradleApi())
-    implementation("com.moandjiezana.toml:toml4j:0.7.2")
     
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.3")
     testImplementation("org.mockito:mockito-core:5.7.0")
@@ -34,6 +33,12 @@ gradlePlugin {
             implementationClass = "com.example.CatalogSettingsPlugin"
             displayName = "Library Versions Catalog Plugin"
             description = "Creates and manages libs.versions.toml during settings evaluation phase"
+        }
+        create("catalogProjectPlugin") {
+            id = "com.example.catalog-project-plugin"
+            implementationClass = "com.example.CatalogProjectPlugin"
+            displayName = "Catalog Project Plugin"
+            description = "Simple project plugin that logs when applied"
         }
     }
 }

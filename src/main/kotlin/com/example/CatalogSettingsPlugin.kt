@@ -3,8 +3,6 @@ package com.example
 import org.gradle.api.Plugin
 import org.gradle.api.initialization.Settings
 import org.gradle.api.InvalidUserDataException
-import com.moandjiezana.toml.Toml
-import com.moandjiezana.toml.TomlWriter
 import java.io.File
 
 class CatalogSettingsPlugin : Plugin<Settings> {
@@ -97,47 +95,78 @@ class CatalogSettingsPlugin : Plugin<Settings> {
     }
     
     private fun extractVersionsSection(content: String): Map<String, String> {
-        val versions = mutableMapOf<String, String>()
-        val versionRegex = """^(\w+)\s*=\s*"([^"]+)"""".toRegex(RegexOption.MULTILINE)
-        
-        // Find the [versions] section
-        val versionsSection = extractSection(content, "versions")
-        if (versionsSection != null) {
-            versionRegex.findAll(versionsSection).forEach { match ->
-                versions[match.groupValues[1]] = match.groupValues[2]
-            }
-        }
-        return versions
+        return extractSectionKeyValues(content, "versions")
     }
     
     private fun extractLibrariesSection(content: String): Map<String, String> {
-        val libraries = mutableMapOf<String, String>()
-        // Extract library definitions (more complex due to inline tables)
-        val librariesSection = extractSection(content, "libraries")
-        if (librariesSection != null) {
-            val libraryRegex = """^([\w-]+)\s*=\s*(.+)$""".toRegex(RegexOption.MULTILINE)
-            libraryRegex.findAll(librariesSection).forEach { match ->
-                libraries[match.groupValues[1]] = match.groupValues[2]
-            }
-        }
-        return libraries
+        return extractSectionKeyValues(content, "libraries")
     }
     
     private fun extractPluginsSection(content: String): Map<String, String> {
-        val plugins = mutableMapOf<String, String>()
-        val pluginsSection = extractSection(content, "plugins")
-        if (pluginsSection != null) {
-            val pluginRegex = """^([\w-]+)\s*=\s*(.+)$""".toRegex(RegexOption.MULTILINE)
-            pluginRegex.findAll(pluginsSection).forEach { match ->
-                plugins[match.groupValues[1]] = match.groupValues[2]
-            }
-        }
-        return plugins
+        return extractSectionKeyValues(content, "plugins")
     }
     
-    private fun extractSection(content: String, sectionName: String): String? {
-        val sectionRegex = """\[$sectionName\](.*?)(?=\[|\z)""".toRegex(RegexOption.DOT_MATCHES_ALL)
-        return sectionRegex.find(content)?.groupValues?.get(1)?.trim()
+    private fun extractSectionKeyValues(tomlContent: String, sectionName: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val lines = tomlContent.lines()
+        var inTargetSection = false
+        
+        for (line in lines) {
+            val trimmedLine = line.trim()
+            
+            when {
+                // Found target section
+                trimmedLine == "[$sectionName]" -> inTargetSection = true
+                
+                // Found different section - exit target section
+                trimmedLine.startsWith("[") && trimmedLine != "[$sectionName]" -> inTargetSection = false
+                
+                // Parse key-value in target section
+                inTargetSection && isKeyValueLine(trimmedLine) -> {
+                    parseKeyValue(trimmedLine)?.let { (key, value) ->
+                        result[key] = value
+                    }
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    private fun isKeyValueLine(line: String): Boolean {
+        return line.isNotEmpty() && 
+               !line.startsWith("#") && 
+               line.contains("=")
+    }
+    
+    private fun parseKeyValue(line: String): Pair<String, String>? {
+        val equalIndex = line.indexOf("=")
+        if (equalIndex == -1) return null
+        
+        val key = line.substring(0, equalIndex).trim()
+        val valueRaw = line.substring(equalIndex + 1).trim()
+        
+        // Remove quotes and inline comments
+        val value = cleanValue(valueRaw)
+        
+        return if (key.isNotEmpty()) key to value else null
+    }
+    
+    private fun cleanValue(rawValue: String): String {
+        var value = rawValue
+        
+        // Remove inline comments
+        val commentIndex = value.indexOf("#")
+        if (commentIndex != -1) {
+            value = value.substring(0, commentIndex).trim()
+        }
+        
+        // Remove surrounding quotes
+        if (value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length - 1)
+        }
+        
+        return value
     }
     
     private fun mergeVersionMaps(existing: Map<String, String>, template: Map<String, String>): Map<String, String> {
